@@ -26,11 +26,16 @@ public class CategoryService {
     }
 
     public record AiCategoryResponse(
-            @JsonProperty(required = true) Long id,
+            @JsonProperty(required = true) Long categoryId,
+            @JsonProperty(required = true) String sourceDescription,
             @JsonProperty(required = true) String observation
     ) {
     }
 
+    public record AiCategoryListResponse(
+            @JsonProperty(required = true) List<AiCategoryResponse> categories
+    ) {
+    }
     public List<Category> listCategories() {
         return List.of(
                 new Category(1L, "Salary"),
@@ -41,9 +46,9 @@ public class CategoryService {
         );
     }
 
-    public Category guessCategory(String description){
+    public List<Category> guessCategory(List<String> descriptions){
 
-        BeanOutputConverter<AiCategoryResponse> converter = new BeanOutputConverter<>(AiCategoryResponse.class);
+        BeanOutputConverter<AiCategoryListResponse> converter = new BeanOutputConverter<>(AiCategoryListResponse.class);
 
         OpenAiChatOptions options = OpenAiChatOptions.builder()
                 .model(OpenAiApi.ChatModel.GPT_4_1_MINI)
@@ -56,10 +61,10 @@ public class CategoryService {
         String promptContent;
         try {
             promptContent = """
-              You are a financial transaction classifier. You will analyze the parsed transaction and define what should be the category.
+              You are a financial transaction classifier. You will analyze the parsed transactions and define what should be the category for each one.
               
               # Input Transaction
-              * `%s`
+              %s
               
               # System candidates
               ```json
@@ -67,11 +72,17 @@ public class CategoryService {
               ```
               
               # Instructions:
-              - Your input should be from **Input Transactions**
+              - You must classify each transaction from the **Input Transactions** list
               - Category is mandatory, so, make the most educated guess, however, there will be cases where an assumption should be made.
-              - Your output contains the categoryId, with is a long that must match the list of **System Candidates Categories**
-              - The output also contains observation an optional String that you should inform additional notes or rational behind the chosen category.
-              """.formatted(description, objectMapper.writeValueAsString(listCategories()));
+              - Your output contains:
+                * categoryId, with is a long that must match the list of **System Candidates Categories**
+                * sourceDescription: the original transaction text exactly as provided in the input
+                * observation: an optional String that you should inform additional notes or rational behind the chosen category.
+              """
+                    .formatted(
+                            descriptions.stream().map(d -> " - `" + d + "`").reduce((a, b) -> a + "\n" + b).orElse(""),
+                            objectMapper.writeValueAsString(listCategories())
+                    );
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -79,11 +90,19 @@ public class CategoryService {
         Prompt prompt = new Prompt(promptContent, options);
 
         var response = openAiChatModel.call(prompt);
-        Long categoryId = converter.convert(response.getResult().getOutput().getText()).id;
+        var responseObject = converter.convert(response.getResult().getOutput().getText());
 
-        return listCategories().stream()
-                .filter(category -> category.id().equals(categoryId))
-                .findFirst()
-                .orElseThrow();
+        return descriptions.stream()
+                .map(description -> {
+                    AiCategoryResponse current = responseObject.categories().stream()
+                            .filter(c -> description.equals(c.sourceDescription()))
+                            .findFirst()
+                            .orElseThrow();
+                    return listCategories().stream()
+                            .filter(category -> category.id() == current.categoryId())
+                            .findFirst()
+                            .orElseThrow();
+                })
+                .toList();
     }
 }
