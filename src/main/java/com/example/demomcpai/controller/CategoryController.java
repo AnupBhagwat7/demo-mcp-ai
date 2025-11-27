@@ -25,7 +25,9 @@ public class CategoryController {
     }
 
     @GetMapping("/categories/ai-classification")
-    public Category guessCategory(@RequestParam String description){
-        return categoryService.guessCategory(description);
+    public List<Category> guessCategory(@RequestParam List<String> descriptions) {
+        return descriptions.stream()
+                .map(categoryService::guessCategory)
+                .toList();
     }
 }

@@ -22,10 +22,12 @@ public class CategoryControllerTest extends DemoMcpAiApplicationTests {
 
     @Test
     void guessCategory() throws Exception {
-        mockMvc.perform(get("/api/categories/ai-classification?description=Bookmyshow"))
+        mockMvc.perform(get("/api/categories/ai-classification?descriptions=Bookmyshow, Raheja"))
                 .andDo(print())
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(3))
-                .andExpect(jsonPath("$.name").value("Travel"));
+                .andExpect(jsonPath("$[0].id").value(3))
+                .andExpect(jsonPath("$[0].name").value("Travel"))
+                .andExpect(jsonPath("$[1].id").value(4))
+                .andExpect(jsonPath("$[1].name").value("Rent"));
     }
 }
