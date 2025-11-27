@@ -47,6 +47,8 @@ public class CategoryService {
 
         OpenAiChatOptions options = OpenAiChatOptions.builder()
                 .model(OpenAiApi.ChatModel.GPT_4_1_MINI)
+                .maxTokens(1000) // helps to manage cost by limiting the quantity of tokens
+                .temperature(0.0) // makes the answer closer to deterministic
                 .responseFormat(new ResponseFormat(ResponseFormat.Type.JSON_SCHEMA, converter.getJsonSchema()))
                 .build();
 
