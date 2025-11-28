@@ -3,12 +3,14 @@ package com.example.demomcpai.service;
 import com.example.demomcpai.entity.Category;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.converter.BeanOutputConverter;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.ai.openai.api.OpenAiApi;
 import org.springframework.ai.openai.api.ResponseFormat;
+import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -18,11 +20,9 @@ public class CategoryService {
 
 
     private final OpenAiChatModel openAiChatModel;
-    private final ObjectMapper objectMapper;
 
-    public CategoryService(OpenAiChatModel openAiChatModel, ObjectMapper objectMapper) {
+    public CategoryService(OpenAiChatModel openAiChatModel) {
         this.openAiChatModel = openAiChatModel;
-        this.objectMapper = objectMapper;
     }
 
     public record AiCategoryResponse(
@@ -36,6 +36,8 @@ public class CategoryService {
             @JsonProperty(required = true) List<AiCategoryResponse> categories
     ) {
     }
+
+    @Tool(description = "List all the system categories")
     public List<Category> listCategories() {
         return List.of(
                 new Category(1L, "Salary"),
@@ -66,13 +68,9 @@ public class CategoryService {
               # Input Transaction
               %s
               
-              # System candidates
-              ```json
-              %s
-              ```
-              
               # Instructions:
               - You must classify each transaction from the **Input Transactions** list
+              - You should use listCategories tool to get the list of candidates categories
               - Category is mandatory, so, make the most educated guess, however, there will be cases where an assumption should be made.
               - Your output contains:
                 * categoryId, with is a long that must match the list of **System Candidates Categories**
@@ -80,17 +78,23 @@ public class CategoryService {
                 * observation: an optional String that you should inform additional notes or rational behind the chosen category.
               """
                     .formatted(
-                            descriptions.stream().map(d -> " - `" + d + "`").reduce((a, b) -> a + "\n" + b).orElse(""),
-                            objectMapper.writeValueAsString(listCategories())
+                            descriptions.stream().map(d -> " - `" + d + "`").reduce((a, b) -> a + "\n" + b).orElse("")
                     );
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
 
-        Prompt prompt = new Prompt(promptContent, options);
+        Prompt prompt = new Prompt(promptContent);
 
-        var response = openAiChatModel.call(prompt);
-        var responseObject = converter.convert(response.getResult().getOutput().getText());
+        var categoryTools = new CategoryService(openAiChatModel);
+
+        var response = ChatClient.create(openAiChatModel)
+                .prompt(prompt)
+                .options(options)
+                .tools(categoryTools)
+                .call();
+
+        var responseObject = converter.convert(response.content());
 
         return descriptions.stream()
                 .map(description -> {
