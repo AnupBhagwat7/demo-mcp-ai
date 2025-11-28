@@ -30,4 +30,16 @@ public class CategoryControllerTest extends DemoMcpAiApplicationTests {
                 .andExpect(jsonPath("$[1].id").value(4))
                 .andExpect(jsonPath("$[1].name").value("Rent"));
     }
+
+    @Test
+    public void guessNewCategory() throws Exception {
+
+        mockMvc.perform(get("/api/categories/ai-classification?descriptions=Max life, Netflix"))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(6))
+                .andExpect(jsonPath("$[0].name").value("Insurance"))
+                .andExpect(jsonPath("$[1].id").value(7))
+                .andExpect(jsonPath("$[1].name").value("Entertainment"));
+    }
 }

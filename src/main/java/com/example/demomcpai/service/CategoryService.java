@@ -1,8 +1,8 @@
 package com.example.demomcpai.service;
 
 import com.example.demomcpai.entity.Category;
+import com.example.demomcpai.repository.CategoryRepository;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.converter.BeanOutputConverter;
@@ -11,6 +11,7 @@ import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.ai.openai.api.OpenAiApi;
 import org.springframework.ai.openai.api.ResponseFormat;
 import org.springframework.ai.tool.annotation.Tool;
+import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -20,9 +21,12 @@ public class CategoryService {
 
 
     private final OpenAiChatModel openAiChatModel;
+    private final CategoryRepository categoryRepository;
 
-    public CategoryService(OpenAiChatModel openAiChatModel) {
+
+    public CategoryService(OpenAiChatModel openAiChatModel, CategoryRepository categoryRepository) {
         this.openAiChatModel = openAiChatModel;
+        this.categoryRepository = categoryRepository;
     }
 
     public record AiCategoryResponse(
@@ -39,14 +43,22 @@ public class CategoryService {
 
     @Tool(description = "List all the system categories")
     public List<Category> listCategories() {
-        return List.of(
-                new Category(1L, "Salary"),
-                new Category(2L, "Office supplies"),
-                new Category(3L, "Travel"),
-                new Category(4L, "Rent"),
-                new Category(5L, "Health insurance")
-        );
+        return categoryRepository.listCategories();
     }
+
+    @Tool(description = "Create a new category based on the category name")
+    public Category createCategory(
+            @ToolParam(description = "The name of the category, should be clean and preferable no more than 3 words")
+            String categoryName
+    ) {
+        Long newId = listCategories().stream()
+                .map(Category::id)
+                .max(Long::compareTo)
+                .orElse(1L);
+        Category category = new Category(newId + 1, categoryName);
+        return categoryRepository.addCategory(category);
+    }
+
 
     public List<Category> guessCategory(List<String> descriptions){
 
@@ -72,6 +84,8 @@ public class CategoryService {
               - You must classify each transaction from the **Input Transactions** list
               - You should use listCategories tool to get the list of candidates categories
               - Category is mandatory, so, make the most educated guess, however, there will be cases where an assumption should be made.
+              - You must try using the existing categories, even though, they don't have an exact match.
+              - In the case there is no absolute no matching close category, you can use the tool createCategory, however, you should avoid it.
               - Your output contains:
                 * categoryId, with is a long that must match the list of **System Candidates Categories**
                 * sourceDescription: the original transaction text exactly as provided in the input
@@ -86,7 +100,7 @@ public class CategoryService {
 
         Prompt prompt = new Prompt(promptContent);
 
-        var categoryTools = new CategoryService(openAiChatModel);
+        var categoryTools = new CategoryService(openAiChatModel, categoryRepository);
 
         var response = ChatClient.create(openAiChatModel)
                 .prompt(prompt)
