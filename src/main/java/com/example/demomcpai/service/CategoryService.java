@@ -48,7 +48,7 @@ public class CategoryService {
 
     @Tool(description = "Create a new category based on the category name")
     public Category createCategory(
-            @ToolParam(description = "The name of the category, should be clean and preferable no more than 3 words")
+            @ToolParam(description = "The name of the category, should be clean and preferable not more than 3 words")
             String categoryName
     ) {
         Long newId = listCategories().stream()
@@ -65,7 +65,7 @@ public class CategoryService {
         BeanOutputConverter<AiCategoryListResponse> converter = new BeanOutputConverter<>(AiCategoryListResponse.class);
 
         OpenAiChatOptions options = OpenAiChatOptions.builder()
-                .model(OpenAiApi.ChatModel.GPT_4_1_MINI)
+                .model(OpenAiApi.ChatModel.GPT_4_1)
                 .maxTokens(1000) // helps to manage cost by limiting the quantity of tokens
                 .temperature(0.0) // makes the answer closer to deterministic
                 .responseFormat(new ResponseFormat(ResponseFormat.Type.JSON_SCHEMA, converter.getJsonSchema()))
@@ -77,19 +77,45 @@ public class CategoryService {
             promptContent = """
               You are a financial transaction classifier. You will analyze the parsed transactions and define what should be the category for each one.
               
+              Your job is to assign the most appropriate **system category** to each description that appears in **Input Transactions**.
+              
               # Input Transaction
               %s
               
               # Instructions:
-              - You must classify each transaction from the **Input Transactions** list
-              - You should use listCategories tool to get the list of candidates categories
-              - Category is mandatory, so, make the most educated guess, however, there will be cases where an assumption should be made.
-              - You must try using the existing categories, even though, they don't have an exact match.
-              - In the case there is no absolute no matching close category, you can use the tool createCategory, however, you should avoid it.
-              - Your output contains:
-                * categoryId, with is a long that must match the list of **System Candidates Categories**
-                * sourceDescription: the original transaction text exactly as provided in the input
-                * observation: an optional String that you should inform additional notes or rational behind the chosen category.
+              1. You MUST call **listCategories** first and prefer one of those IDs even when the match is only approximate.
+              2. Only call **createCategory** when none of the existing categories are even roughly relevant.
+                 • Call it once per batch of transactions at most.
+              3. For every input description you must output an object containing:
+                 • **categoryId** – a Long that exists in the system (or was just returned by createCategory)
+                 • **sourceDescription** – the original text, unchanged
+                 • **observation** – optional free-text notes on your reasoning
+              
+              # FEW-SHOT EXAMPLES
+              (These examples guide you on how to behave.)
+              
+              ## Example 1 – all transactions can reuse existing categories
+              **System categories** (id → name):
+              1: Salary; 2: Office supplies; 3: Travel; 4: Rent; 5: Health insurance
+              
+              **Input transactions**
+              • Foxtons Real State London
+              • TFL TRAVEL CHARGE TFL.GOV.UK/CP
+              
+              **Assistant reasoning (implicit)**
+              - “Foxtons” is a real-estate letting agent → choose category *Rent* (id 4).
+              - “TFL” is London public transport → choose category *Travel* (id 3).
+              
+              ## Example 2 – no suitable category, so create one
+              System categories (same as above)
+              
+              **Input transactions**
+              • McDonald's
+              
+              **Assistant reasoning (implicit)**
+              - No existing category fits a restaurant/fast-food spend.\s
+              - Call createCategory("Eating Out") → suppose it returns { "id": 6, "name": "Eating Out" }.
+              
               """
                     .formatted(
                             descriptions.stream().map(d -> " - `" + d + "`").reduce((a, b) -> a + "\n" + b).orElse("")
