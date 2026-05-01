@@ -2,11 +2,10 @@ package com.example.demomcpai.controller;
 
 import com.example.demomcpai.entity.Category;
 import com.example.demomcpai.service.CategoryService;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.List;
 
 @RestController
@@ -28,4 +27,10 @@ public class CategoryController {
     public List<Category> guessCategory(@RequestParam List<String> descriptions) {
         return categoryService.guessCategory(descriptions);
     }
+
+    @PostMapping("/categories/ai-classification/pdf")
+    public List<Category> guessCategoryPdf(@RequestParam("file") MultipartFile file) throws IOException {
+        return categoryService.guessCategoryPdf(file);
+    }
+
 }
