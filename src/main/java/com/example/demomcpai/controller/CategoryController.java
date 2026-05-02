@@ -2,6 +2,7 @@ package com.example.demomcpai.controller;
 
 import com.example.demomcpai.entity.Category;
 import com.example.demomcpai.service.CategoryService;
+import com.example.demomcpai.tools.CategoryTools;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 

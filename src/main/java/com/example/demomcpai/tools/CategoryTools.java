@@ -4,9 +4,11 @@ import com.example.demomcpai.entity.Category;
 import com.example.demomcpai.repository.CategoryRepository;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
+import org.springframework.stereotype.Component;
 
 import java.util.List;
 
+@Component
 public class CategoryTools {
 
     private final CategoryRepository categoryRepository;

@@ -10,8 +10,6 @@ import org.springframework.ai.anthropic.AnthropicChatOptions;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.converter.BeanOutputConverter;
-import org.springframework.ai.tool.annotation.Tool;
-import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -172,5 +170,9 @@ public class CategoryService {
                             .orElseThrow();
                 })
                 .toList();
+    }
+
+    public List<Category> listCategories() {
+        return categoryRepository.listCategories();
     }
 }
